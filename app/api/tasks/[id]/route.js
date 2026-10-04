@@ -10,6 +10,7 @@ function mapTask(row) {
     ...row,
     due_date: row.due_date ? String(row.due_date).slice(0, 10) : null,
     due_time: row.due_time ? String(row.due_time).slice(0, 5) : null,
+    reminder_at: row.reminder_at ? new Date(row.reminder_at).toISOString() : null,
     priority: Number(row.priority),
   };
 }
@@ -29,6 +30,7 @@ export async function PATCH(request, { params }) {
   const projectId = body.project_id != null ? body.project_id : task.project_id;
   const dueDate = body.due_date !== undefined ? body.due_date || null : task.due_date;
   const dueTime = body.due_time !== undefined ? body.due_time || null : task.due_time;
+  const reminderAt = body.reminder_at !== undefined ? body.reminder_at || null : task.reminder_at;
   let completed = task.is_completed;
   let completedAt = task.completed_at;
   if (body.is_completed != null) {
@@ -43,6 +45,7 @@ export async function PATCH(request, { params }) {
       project_id = ${projectId},
       due_date = ${dueDate},
       due_time = ${dueTime},
+      reminder_at = ${reminderAt},
       is_completed = ${completed},
       completed_at = ${completedAt}
     WHERE id = ${id} AND user_id = ${auth.user.id}

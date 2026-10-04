@@ -10,6 +10,7 @@ function mapTask(row) {
     ...row,
     due_date: row.due_date ? String(row.due_date).slice(0, 10) : null,
     due_time: row.due_time ? String(row.due_time).slice(0, 5) : null,
+    reminder_at: row.reminder_at ? new Date(row.reminder_at).toISOString() : null,
     priority: Number(row.priority),
   };
 }
@@ -30,35 +31,26 @@ export async function GET(request) {
         AND due_date = CURRENT_DATE
         AND (${includeCompleted} OR is_completed = false)
       ORDER BY is_completed ASC, priority DESC, due_time ASC NULLS LAST, sort_order ASC`;
-  } else if (view === "upcoming") {
+  } else if (view === "upcoming" || view === "calendar") {
     rows = await db`
       SELECT * FROM tasks
       WHERE user_id = ${auth.user.id}
         AND due_date IS NOT NULL
-        AND due_date >= CURRENT_DATE
         AND (${includeCompleted} OR is_completed = false)
       ORDER BY due_date ASC, due_time ASC NULLS LAST, priority DESC`;
-  } else if (view === "inbox") {
+  } else if (view === "inbox" || !projectId) {
     rows = await db`
-      SELECT t.* FROM tasks t
-      JOIN projects p ON p.id = t.project_id
-      WHERE t.user_id = ${auth.user.id}
-        AND p.is_inbox = true
-        AND (${includeCompleted} OR t.is_completed = false)
-      ORDER BY t.is_completed ASC, t.priority DESC, t.created_at DESC`;
-  } else if (projectId) {
+      SELECT * FROM tasks
+      WHERE user_id = ${auth.user.id}
+        AND (${includeCompleted} OR is_completed = false)
+      ORDER BY is_completed ASC, priority DESC, due_date ASC NULLS LAST, created_at DESC`;
+  } else {
     rows = await db`
       SELECT * FROM tasks
       WHERE user_id = ${auth.user.id}
         AND project_id = ${projectId}
         AND (${includeCompleted} OR is_completed = false)
       ORDER BY is_completed ASC, priority DESC, due_date ASC NULLS LAST, sort_order ASC`;
-  } else {
-    rows = await db`
-      SELECT * FROM tasks
-      WHERE user_id = ${auth.user.id}
-        AND (${includeCompleted} OR is_completed = false)
-      ORDER BY is_completed ASC, priority DESC, due_date ASC NULLS LAST`;
   }
   return json({ tasks: rows.map(mapTask) });
 }
@@ -82,12 +74,13 @@ export async function POST(request) {
   const priority = Math.min(4, Math.max(1, Number(body.priority || 1)));
   const dueDate = body.due_date || null;
   const dueTime = body.due_time || null;
+  const reminderAt = body.reminder_at || null;
   const taskId = id();
   const rows = await db`
-    INSERT INTO tasks (id, user_id, project_id, parent_id, content, description, priority, due_date, due_time)
+    INSERT INTO tasks (id, user_id, project_id, parent_id, content, description, priority, due_date, due_time, reminder_at)
     VALUES (
       ${taskId}, ${auth.user.id}, ${projectId}, ${body.parent_id || null}, ${content},
-      ${String(body.description || "")}, ${priority}, ${dueDate}, ${dueTime}
+      ${String(body.description || "")}, ${priority}, ${dueDate}, ${dueTime}, ${reminderAt}
     )
     RETURNING *`;
   return json({ task: mapTask(rows[0]) }, 201);
